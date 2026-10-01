@@ -1888,3 +1888,31 @@ button {
       220px;
   }
 }
+
+
+/* ===== Custom V2.22 — smooth mobile timeline gestures ===== */
+
+/*
+  Timeline interaction:
+  - 1 finger: pan left/right
+  - 2 fingers: pinch zoom
+  - Pointer events are coalesced to one React update per animation frame
+    to reduce mobile jank.
+*/
+.timeline-canvas {
+  overscroll-behavior: contain;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+@media (max-width: 820px) {
+  .timeline-canvas {
+    touch-action: none;
+  }
+
+  .decade-tick,
+  .event-year-marker,
+  .level1-star-marker {
+    -webkit-tap-highlight-color: transparent;
+  }
+}

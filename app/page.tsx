@@ -127,8 +127,33 @@ export default function Home() {
 
   const [centerYear, setCenterYear] = useState(1900);
   const [scale, setScale] = useState(5);
-  const [draggingTimeline, setDraggingTimeline] = useState(false);
-  const [lastPointerX, setLastPointerX] = useState(0);
+
+  const centerYearRef = useRef(1900);
+  const scaleRef = useRef(5);
+  const timelinePointersRef = useRef(
+    new Map<number, { x: number; y: number }>()
+  );
+  const timelineGestureRef = useRef<{
+    mode: "none" | "pan" | "pinch";
+    startX: number;
+    startCenterYear: number;
+    startScale: number;
+    startDistance: number;
+    anchorYear: number;
+  }>({
+    mode: "none",
+    startX: 0,
+    startCenterYear: 1900,
+    startScale: 5,
+    startDistance: 0,
+    anchorYear: 1900,
+  });
+  const timelineDidDragRef = useRef(false);
+  const timelineFrameRef = useRef<number | null>(null);
+  const timelinePendingViewRef = useRef<{
+    centerYear: number;
+    scale: number;
+  } | null>(null);
 
   const [mobileTimelineViewport, setMobileTimelineViewport] = useState({
     active: false,
@@ -174,6 +199,22 @@ export default function Home() {
 
   useEffect(() => {
     loadNodes();
+  }, []);
+
+  useEffect(() => {
+    centerYearRef.current = centerYear;
+  }, [centerYear]);
+
+  useEffect(() => {
+    scaleRef.current = scale;
+  }, [scale]);
+
+  useEffect(() => {
+    return () => {
+      if (timelineFrameRef.current !== null) {
+        cancelAnimationFrame(timelineFrameRef.current);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -823,35 +864,231 @@ export default function Home() {
     openDecadeForYear(targetYear);
   }
 
+  function queueTimelineView(nextCenterYear: number, nextScale: number) {
+    centerYearRef.current = nextCenterYear;
+    scaleRef.current = nextScale;
+    timelinePendingViewRef.current = {
+      centerYear: nextCenterYear,
+      scale: nextScale,
+    };
+
+    if (timelineFrameRef.current !== null) return;
+
+    timelineFrameRef.current = requestAnimationFrame(() => {
+      timelineFrameRef.current = null;
+
+      const pending = timelinePendingViewRef.current;
+      timelinePendingViewRef.current = null;
+      if (!pending) return;
+
+      setCenterYear(pending.centerYear);
+      setScale(pending.scale);
+    });
+  }
+
   function handleTimelineWheel(event: React.WheelEvent<SVGSVGElement>) {
     event.preventDefault();
 
     const rect = event.currentTarget.getBoundingClientRect();
-    const mouseX = ((event.clientX - rect.left) / rect.width) * timelineWidth;
-    const yearAtMouse = xToYear(mouseX);
+    const mouseX =
+      ((event.clientX - rect.left) / rect.width) * timelineWidth;
+    const currentScale = scaleRef.current;
+    const currentCenter = centerYearRef.current;
+    const yearAtMouse =
+      currentCenter + (mouseX - timelineWidth / 2) / currentScale;
+
     const factor = event.deltaY < 0 ? 1.15 : 0.87;
-    const newScale = Math.min(80, Math.max(0.08, scale * factor));
-    const newCenter = yearAtMouse - (mouseX - timelineWidth / 2) / newScale;
+    const newScale = Math.min(
+      80,
+      Math.max(0.08, currentScale * factor)
+    );
+    const newCenter =
+      yearAtMouse -
+      (mouseX - timelineWidth / 2) / newScale;
 
-    setScale(newScale);
-    setCenterYear(newCenter);
+    queueTimelineView(newCenter, newScale);
   }
 
-  function handleTimelinePointerDown(event: React.PointerEvent<SVGSVGElement>) {
-    setDraggingTimeline(true);
-    setLastPointerX(event.clientX);
-    event.currentTarget.setPointerCapture(event.pointerId);
+  function beginTimelinePinch(canvas: SVGSVGElement) {
+    const points = Array.from(timelinePointersRef.current.values());
+    if (points.length < 2) return;
+
+    const first = points[0];
+    const second = points[1];
+    const distance = Math.hypot(
+      second.x - first.x,
+      second.y - first.y
+    );
+
+    if (distance <= 0) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const midpointX = (first.x + second.x) / 2;
+    const logicalMidpointX =
+      ((midpointX - rect.left) / rect.width) * timelineWidth;
+
+    const currentScale = scaleRef.current;
+    const currentCenter = centerYearRef.current;
+
+    timelineGestureRef.current = {
+      mode: "pinch",
+      startX: midpointX,
+      startCenterYear: currentCenter,
+      startScale: currentScale,
+      startDistance: distance,
+      anchorYear:
+        currentCenter +
+        (logicalMidpointX - timelineWidth / 2) / currentScale,
+    };
   }
 
-  function handleTimelinePointerMove(event: React.PointerEvent<SVGSVGElement>) {
-    if (!draggingTimeline) return;
-    const dx = event.clientX - lastPointerX;
-    setCenterYear((year) => year - dx / scale);
-    setLastPointerX(event.clientX);
+  function handleTimelinePointerDown(
+    event: React.PointerEvent<SVGSVGElement>
+  ) {
+    const canvas = event.currentTarget;
+
+    timelinePointersRef.current.set(event.pointerId, {
+      x: event.clientX,
+      y: event.clientY,
+    });
+
+    timelineDidDragRef.current = false;
+
+    try {
+      canvas.setPointerCapture(event.pointerId);
+    } catch {
+      // Some browsers can reject pointer capture during fast multi-touch.
+    }
+
+    if (timelinePointersRef.current.size >= 2) {
+      beginTimelinePinch(canvas);
+      return;
+    }
+
+    timelineGestureRef.current = {
+      mode: "pan",
+      startX: event.clientX,
+      startCenterYear: centerYearRef.current,
+      startScale: scaleRef.current,
+      startDistance: 0,
+      anchorYear: centerYearRef.current,
+    };
   }
 
-  function handleTimelinePointerUp() {
-    setDraggingTimeline(false);
+  function handleTimelinePointerMove(
+    event: React.PointerEvent<SVGSVGElement>
+  ) {
+    if (!timelinePointersRef.current.has(event.pointerId)) return;
+
+    timelinePointersRef.current.set(event.pointerId, {
+      x: event.clientX,
+      y: event.clientY,
+    });
+
+    const canvas = event.currentTarget;
+    const rect = canvas.getBoundingClientRect();
+
+    if (
+      timelinePointersRef.current.size >= 2 &&
+      timelineGestureRef.current.mode === "pinch"
+    ) {
+      const points = Array.from(
+        timelinePointersRef.current.values()
+      );
+      const first = points[0];
+      const second = points[1];
+
+      const distance = Math.hypot(
+        second.x - first.x,
+        second.y - first.y
+      );
+      const gesture = timelineGestureRef.current;
+
+      if (gesture.startDistance <= 0) return;
+
+      const zoomRatio = distance / gesture.startDistance;
+      const newScale = Math.min(
+        80,
+        Math.max(0.08, gesture.startScale * zoomRatio)
+      );
+
+      const midpointX = (first.x + second.x) / 2;
+      const logicalMidpointX =
+        ((midpointX - rect.left) / rect.width) * timelineWidth;
+
+      const newCenter =
+        gesture.anchorYear -
+        (logicalMidpointX - timelineWidth / 2) / newScale;
+
+      if (
+        Math.abs(distance - gesture.startDistance) > 3 ||
+        Math.abs(midpointX - gesture.startX) > 3
+      ) {
+        timelineDidDragRef.current = true;
+      }
+
+      queueTimelineView(newCenter, newScale);
+      return;
+    }
+
+    if (
+      timelinePointersRef.current.size === 1 &&
+      timelineGestureRef.current.mode === "pan"
+    ) {
+      const gesture = timelineGestureRef.current;
+      const clientDx = event.clientX - gesture.startX;
+      const logicalDx =
+        (clientDx / rect.width) * timelineWidth;
+
+      if (Math.abs(clientDx) > 4) {
+        timelineDidDragRef.current = true;
+      }
+
+      const newCenter =
+        gesture.startCenterYear -
+        logicalDx / gesture.startScale;
+
+      queueTimelineView(newCenter, gesture.startScale);
+    }
+  }
+
+  function handleTimelinePointerUp(
+    event: React.PointerEvent<SVGSVGElement>
+  ) {
+    const canvas = event.currentTarget;
+
+    timelinePointersRef.current.delete(event.pointerId);
+
+    try {
+      if (canvas.hasPointerCapture(event.pointerId)) {
+        canvas.releasePointerCapture(event.pointerId);
+      }
+    } catch {
+      // Safe fallback for browsers that already released capture.
+    }
+
+    if (timelinePointersRef.current.size >= 2) {
+      beginTimelinePinch(canvas);
+      return;
+    }
+
+    if (timelinePointersRef.current.size === 1) {
+      const remaining = Array.from(
+        timelinePointersRef.current.values()
+      )[0];
+
+      timelineGestureRef.current = {
+        mode: "pan",
+        startX: remaining.x,
+        startCenterYear: centerYearRef.current,
+        startScale: scaleRef.current,
+        startDistance: 0,
+        anchorYear: centerYearRef.current,
+      };
+      return;
+    }
+
+    timelineGestureRef.current.mode = "none";
   }
 
   // Smallest interval = 10 years.
@@ -1280,7 +1517,7 @@ export default function Home() {
           onPointerDown={handleTimelinePointerDown}
           onPointerMove={handleTimelinePointerMove}
           onPointerUp={handleTimelinePointerUp}
-          onPointerLeave={handleTimelinePointerUp}
+          onPointerCancel={handleTimelinePointerUp}
         >
           <rect width={timelineWidth} height={timelineHeight} fill="#ffffff" />
           <line x1="0" y1={timelineY} x2={timelineWidth} y2={timelineY} stroke="#9ca3af" strokeWidth="2" />
@@ -1325,9 +1562,9 @@ export default function Home() {
                 key={year}
                 className="decade-tick"
                 opacity={outsideMainRange ? 0.3 : 1}
-                onPointerDown={(event) => event.stopPropagation()}
                 onClick={(event) => {
                   event.stopPropagation();
+                  if (timelineDidDragRef.current) return;
                   openDecade(year);
                 }}
               >
@@ -1385,9 +1622,9 @@ export default function Home() {
                 key={`event-year-${year}`}
                 className={markerStyle.className}
                 opacity={outsideMainRange ? 0.45 : 1}
-                onPointerDown={(event) => event.stopPropagation()}
                 onClick={(event) => {
                   event.stopPropagation();
+                  if (timelineDidDragRef.current) return;
                   openYearEvents(year);
                 }}
               >
@@ -1426,9 +1663,9 @@ export default function Home() {
                 key={`level1-star-${marker.event.id}`}
                 className="level1-star-marker"
                 opacity={outsideMainRange ? 0.45 : 1}
-                onPointerDown={(event) => event.stopPropagation()}
                 onClick={(event) => {
                   event.stopPropagation();
+                  if (timelineDidDragRef.current) return;
                   selectEvent(marker.event);
                 }}
               >
