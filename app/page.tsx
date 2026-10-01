@@ -130,9 +130,18 @@ export default function Home() {
   const [draggingTimeline, setDraggingTimeline] = useState(false);
   const [lastPointerX, setLastPointerX] = useState(0);
 
-  const timelineWidth = 1600;
-  const timelineHeight = 200;
-  const timelineY = 90;
+  const [timelineViewport, setTimelineViewport] = useState({
+    width: 1600,
+    height: 200,
+  });
+  const timelineCanvasRef = useRef<SVGSVGElement | null>(null);
+
+  const timelineWidth = timelineViewport.width;
+  const timelineHeight = timelineViewport.height;
+  const timelineY = Math.min(
+    110,
+    Math.max(90, Math.round(timelineHeight * 0.46))
+  );
 
   async function loadNodes() {
     setLoading(true);
@@ -158,6 +167,44 @@ export default function Home() {
 
   useEffect(() => {
     loadNodes();
+  }, []);
+
+  useEffect(() => {
+    const canvas = timelineCanvasRef.current;
+    if (!canvas) return;
+
+    function syncTimelineViewport() {
+      const rect = canvas.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+
+      const nextWidth = Math.max(320, Math.round(rect.width));
+      const nextHeight = Math.max(190, Math.round(rect.height));
+
+      setTimelineViewport((current) => {
+        if (
+          current.width === nextWidth &&
+          current.height === nextHeight
+        ) {
+          return current;
+        }
+
+        return {
+          width: nextWidth,
+          height: nextHeight,
+        };
+      });
+    }
+
+    syncTimelineViewport();
+
+    const observer = new ResizeObserver(syncTimelineViewport);
+    observer.observe(canvas);
+    window.addEventListener("resize", syncTimelineViewport);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", syncTimelineViewport);
+    };
   }, []);
 
   useEffect(() => {
@@ -1204,6 +1251,7 @@ export default function Home() {
         </div>
 
         <svg
+          ref={timelineCanvasRef}
           className="timeline-canvas"
           viewBox={`0 0 ${timelineWidth} ${timelineHeight}`}
           onWheel={handleTimelineWheel}
@@ -1278,7 +1326,7 @@ export default function Home() {
                   fill={active ? "#eff6ff" : "#ffffff"}
                   stroke={active ? "#2563eb" : "#e5e7eb"}
                 />
-                <text x={x} y={timelineY + 48} fill="#374151" textAnchor="middle" fontSize="12" fontWeight="650">
+                <text x={x} y={timelineY + 48} fill="#374151" textAnchor="middle" fontSize={timelineWidth < 700 ? "13" : "12"} fontWeight="650">
                   {formatYear(year)}
                 </text>
               </g>
@@ -1293,20 +1341,20 @@ export default function Home() {
               ? {
                   fill: "#dc2626",
                   textFill: "#dc2626",
-                  radius: count > 1 ? 7 : 6,
+                  radius: timelineWidth < 700 ? (count > 1 ? 8 : 7) : (count > 1 ? 7 : 6),
                   className: "event-year-marker marker-level1",
                 }
               : hasLevel2
               ? {
                   fill: "#fca5a5",
                   textFill: "#ef7777",
-                  radius: 4.5,
+                  radius: timelineWidth < 700 ? 5.5 : 4.5,
                   className: "event-year-marker marker-level2",
                 }
               : {
                   fill: "#9ca3af",
                   textFill: "#7b8490",
-                  radius: 4.5,
+                  radius: timelineWidth < 700 ? 5.5 : 4.5,
                   className: "event-year-marker marker-level3",
                 };
 
@@ -1334,7 +1382,7 @@ export default function Home() {
                   y={timelineY - 20}
                   fill={markerStyle.textFill}
                   textAnchor="middle"
-                  fontSize={hasLevel1 ? "11" : "10.5"}
+                  fontSize={timelineWidth < 700 ? (hasLevel1 ? "13" : "12") : (hasLevel1 ? "11" : "10.5")}
                   fontWeight={hasLevel1 ? "800" : "700"}
                 >
                   {formatYear(year)}{count > 1 ? ` · ${count}` : ""}
@@ -1364,7 +1412,12 @@ export default function Home() {
               >
                 <title>{marker.event.title}</title>
                 <polygon
-                  points={buildStarPoints(x, marker.y, 17, 7.8)}
+                  points={buildStarPoints(
+                    x,
+                    marker.y,
+                    timelineWidth < 700 ? 19 : 17,
+                    timelineWidth < 700 ? 8.7 : 7.8
+                  )}
                   fill="#f59e0b"
                   stroke="#ffffff"
                   strokeWidth="2"
