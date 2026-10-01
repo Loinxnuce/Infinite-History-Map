@@ -130,18 +130,25 @@ export default function Home() {
   const [draggingTimeline, setDraggingTimeline] = useState(false);
   const [lastPointerX, setLastPointerX] = useState(0);
 
-  const [timelineViewport, setTimelineViewport] = useState({
-    width: 1600,
+  const [mobileTimelineViewport, setMobileTimelineViewport] = useState({
+    active: false,
+    width: 820,
     height: 200,
   });
   const timelineCanvasRef = useRef<SVGSVGElement | null>(null);
 
-  const timelineWidth = timelineViewport.width;
-  const timelineHeight = timelineViewport.height;
-  const timelineY = Math.min(
-    110,
-    Math.max(90, Math.round(timelineHeight * 0.46))
-  );
+  // Desktop/laptop keeps the original V2.20 timeline exactly:
+  // 1600 x 200 with timelineY = 90.
+  // Only screens <= 820px use the responsive viewport below.
+  const timelineWidth = mobileTimelineViewport.active
+    ? mobileTimelineViewport.width
+    : 1600;
+  const timelineHeight = mobileTimelineViewport.active
+    ? mobileTimelineViewport.height
+    : 200;
+  const timelineY = mobileTimelineViewport.active
+    ? Math.min(112, Math.max(96, Math.round(timelineHeight * 0.46)))
+    : 90;
 
   async function loadNodes() {
     setLoading(true);
@@ -170,18 +177,32 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const canvas = timelineCanvasRef.current;
-    if (!canvas) return;
+    const currentCanvas = timelineCanvasRef.current;
+    if (!currentCanvas) return;
 
-    function syncTimelineViewport() {
-      const rect = canvas.getBoundingClientRect();
+    // Give the captured value a non-null DOM type so production TypeScript
+    // does not lose the null check inside the resize callback.
+    const canvasElement: SVGSVGElement = currentCanvas;
+
+    function syncMobileTimelineViewport() {
+      const isMobile = window.innerWidth <= 820;
+
+      if (!isMobile) {
+        setMobileTimelineViewport((current) =>
+          current.active ? { ...current, active: false } : current
+        );
+        return;
+      }
+
+      const rect = canvasElement.getBoundingClientRect();
       if (!rect.width || !rect.height) return;
 
       const nextWidth = Math.max(320, Math.round(rect.width));
       const nextHeight = Math.max(190, Math.round(rect.height));
 
-      setTimelineViewport((current) => {
+      setMobileTimelineViewport((current) => {
         if (
+          current.active &&
           current.width === nextWidth &&
           current.height === nextHeight
         ) {
@@ -189,21 +210,22 @@ export default function Home() {
         }
 
         return {
+          active: true,
           width: nextWidth,
           height: nextHeight,
         };
       });
     }
 
-    syncTimelineViewport();
+    syncMobileTimelineViewport();
 
-    const observer = new ResizeObserver(syncTimelineViewport);
-    observer.observe(canvas);
-    window.addEventListener("resize", syncTimelineViewport);
+    const observer = new ResizeObserver(syncMobileTimelineViewport);
+    observer.observe(canvasElement);
+    window.addEventListener("resize", syncMobileTimelineViewport);
 
     return () => {
       observer.disconnect();
-      window.removeEventListener("resize", syncTimelineViewport);
+      window.removeEventListener("resize", syncMobileTimelineViewport);
     };
   }, []);
 
@@ -1326,7 +1348,7 @@ export default function Home() {
                   fill={active ? "#eff6ff" : "#ffffff"}
                   stroke={active ? "#2563eb" : "#e5e7eb"}
                 />
-                <text x={x} y={timelineY + 48} fill="#374151" textAnchor="middle" fontSize={timelineWidth < 700 ? "13" : "12"} fontWeight="650">
+                <text x={x} y={timelineY + 48} fill="#374151" textAnchor="middle" fontSize={mobileTimelineViewport.active ? "13" : "12"} fontWeight="650">
                   {formatYear(year)}
                 </text>
               </g>
@@ -1341,20 +1363,20 @@ export default function Home() {
               ? {
                   fill: "#dc2626",
                   textFill: "#dc2626",
-                  radius: timelineWidth < 700 ? (count > 1 ? 8 : 7) : (count > 1 ? 7 : 6),
+                  radius: mobileTimelineViewport.active ? (count > 1 ? 8 : 7) : (count > 1 ? 7 : 6),
                   className: "event-year-marker marker-level1",
                 }
               : hasLevel2
               ? {
                   fill: "#fca5a5",
                   textFill: "#ef7777",
-                  radius: timelineWidth < 700 ? 5.5 : 4.5,
+                  radius: mobileTimelineViewport.active ? 5.5 : 4.5,
                   className: "event-year-marker marker-level2",
                 }
               : {
                   fill: "#9ca3af",
                   textFill: "#7b8490",
-                  radius: timelineWidth < 700 ? 5.5 : 4.5,
+                  radius: mobileTimelineViewport.active ? 5.5 : 4.5,
                   className: "event-year-marker marker-level3",
                 };
 
@@ -1382,7 +1404,7 @@ export default function Home() {
                   y={timelineY - 20}
                   fill={markerStyle.textFill}
                   textAnchor="middle"
-                  fontSize={timelineWidth < 700 ? (hasLevel1 ? "13" : "12") : (hasLevel1 ? "11" : "10.5")}
+                  fontSize={mobileTimelineViewport.active ? (hasLevel1 ? "13" : "12") : (hasLevel1 ? "11" : "10.5")}
                   fontWeight={hasLevel1 ? "800" : "700"}
                 >
                   {formatYear(year)}{count > 1 ? ` · ${count}` : ""}
@@ -1415,8 +1437,8 @@ export default function Home() {
                   points={buildStarPoints(
                     x,
                     marker.y,
-                    timelineWidth < 700 ? 19 : 17,
-                    timelineWidth < 700 ? 8.7 : 7.8
+                    mobileTimelineViewport.active ? 19 : 17,
+                    mobileTimelineViewport.active ? 8.7 : 7.8
                   )}
                   fill="#f59e0b"
                   stroke="#ffffff"

@@ -1804,14 +1804,12 @@ button {
 }
 
 
-/* ===== Custom V2.21 — responsive mobile timeline ===== */
+/* ===== Custom V2.21b — mobile-only timeline optimization ===== */
 
 /*
-  The SVG viewport is synchronized to the real rendered size in page.tsx.
-  This prevents the old 1600-unit desktop timeline from being squeezed
-  into a ~390px phone screen.
+  Desktop/laptop keeps the V2.20 timeline layout.
+  These rules only apply at 820px and below.
 */
-
 @media (max-width: 820px) {
   .history-app,
   .history-app.event-open,
@@ -1835,7 +1833,6 @@ button {
     gap: 8px;
   }
 
-  /* Keep the mobile header clean; the controls matter more than the helper sentence. */
   .timeline-header > div:first-child > span {
     display: none;
   }
@@ -1876,23 +1873,11 @@ button {
       300px;
   }
 
-  .timeline-section {
-    grid-template-rows:
-      34px
-      minmax(0, 1fr);
-  }
-
-  .timeline-header {
-    padding-left: 7px;
-    padding-right: 7px;
-  }
-
   .jump-to-year-form input {
     width: 76px;
   }
 }
 
-/* On short landscape phone screens, don't let the timeline consume the whole page. */
 @media (max-height: 520px) and (orientation: landscape) {
   .history-app,
   .history-app.event-open,
