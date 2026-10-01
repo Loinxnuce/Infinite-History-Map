@@ -1482,8 +1482,8 @@ export default function Home() {
           <div className="empty-reading-state">
             <div className="empty-reading-icon">◌</div>
             <h2>Chào mừng tới dòng chảy lịch sử của tui</h2>
-<h2>Ai đó muốn đóng góp thì liên hệ tui cấp account cho tham gia dự án nha =))</h2>
-<p>Tui tạo website này để ghi lại mọi kiến thức về dòng chảy lịch sử mà mình học được, bởi vì cái đầu cá vàng không thể nhớ được mọi thứ nhất là khi sắp vô tuổi 30. </p>
+<h2>Ai đó muốn đóng góp thì liên hệ tui cấp account cho tham gia henn =))</h2>
+<p>Tui tạo website này để ghi lại mọi kiến thức về lịch sử mà mình học được, thay cho cái đầu cá vàng không thể nhớ được mọi thứ </p>
           </div>
         )}
       </section>
