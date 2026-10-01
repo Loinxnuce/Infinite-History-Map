@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import AddEventForm from "@/components/AddEventForm";
 import { findEventGallery, type GalleryImage } from "@/lib/findEventGallery";
@@ -95,6 +95,10 @@ export default function Home() {
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
   const [galleryLoading, setGalleryLoading] = useState(false);
   const [galleryError, setGalleryError] = useState("");
+
+  const galleryDragStartX = useRef(0);
+  const galleryScrollStart = useRef(0);
+  const galleryDidDrag = useRef(false);
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -655,6 +659,44 @@ export default function Home() {
     returnToDecadeList();
   }
 
+  function handleGalleryPointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    const strip = event.currentTarget;
+
+    galleryDragStartX.current = event.clientX;
+    galleryScrollStart.current = strip.scrollLeft;
+    galleryDidDrag.current = false;
+
+    strip.setPointerCapture(event.pointerId);
+  }
+
+  function handleGalleryPointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    const strip = event.currentTarget;
+
+    if (!strip.hasPointerCapture(event.pointerId)) return;
+
+    const distance = event.clientX - galleryDragStartX.current;
+
+    if (Math.abs(distance) > 4) {
+      galleryDidDrag.current = true;
+    }
+
+    strip.scrollLeft = galleryScrollStart.current - distance;
+  }
+
+  function handleGalleryPointerUp(event: React.PointerEvent<HTMLDivElement>) {
+    const strip = event.currentTarget;
+
+    if (strip.hasPointerCapture(event.pointerId)) {
+      strip.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  function handleGalleryCardClick(event: React.MouseEvent<HTMLAnchorElement>) {
+    if (galleryDidDrag.current) {
+      event.preventDefault();
+    }
+  }
+
   async function handleAdminLogin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setAuthError("");
@@ -1065,7 +1107,14 @@ export default function Home() {
                   <div className="gallery-status">Chưa tìm được hình phù hợp.</div>
                 )}
                 {!galleryLoading && galleryImages.length > 0 && (
-                  <div className="gallery-grid">
+                  <div
+                    className="gallery-strip"
+                    onPointerDown={handleGalleryPointerDown}
+                    onPointerMove={handleGalleryPointerMove}
+                    onPointerUp={handleGalleryPointerUp}
+                    onPointerCancel={handleGalleryPointerUp}
+                    onPointerLeave={handleGalleryPointerUp}
+                  >
                     {galleryImages.map((image, index) => (
                       <a
                         key={`${image.pageUrl}-${index}`}
@@ -1074,6 +1123,7 @@ export default function Home() {
                         rel="noreferrer"
                         className="gallery-card"
                         title={image.title}
+                        onClick={handleGalleryCardClick}
                       >
                         <img src={image.imageUrl} alt={image.title} loading="lazy" />
                         <div className="gallery-caption">{image.title}</div>

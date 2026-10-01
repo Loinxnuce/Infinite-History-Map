@@ -1726,3 +1726,79 @@ button {
     width: auto;
   }
 }
+
+
+/* ===== Custom V2.20 — compact horizontal draggable gallery ===== */
+
+.gallery-section {
+  width: min(1400px, 100%);
+}
+
+/* One horizontal row. Hold left mouse button and drag horizontally. */
+.gallery-strip {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px 2px 10px;
+  cursor: grab;
+  user-select: none;
+  touch-action: pan-y;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.gallery-strip:active {
+  cursor: grabbing;
+}
+
+.gallery-strip::-webkit-scrollbar {
+  height: 6px;
+}
+
+.gallery-strip::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.gallery-strip::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+/* Roughly 2/3 of the previous desktop image-card width. */
+.gallery-strip .gallery-card {
+  flex: 0 0 215px;
+  width: 215px;
+}
+
+.gallery-strip .gallery-card img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  pointer-events: none;
+}
+
+.gallery-strip .gallery-caption {
+  padding: 7px 9px 9px;
+  font-size: 10px;
+  pointer-events: none;
+}
+
+/* The old multi-row gallery grid is no longer used. */
+.gallery-grid {
+  display: none;
+}
+
+@media (max-width: 820px) {
+  .gallery-strip .gallery-card {
+    flex-basis: 190px;
+    width: 190px;
+  }
+}
+
+@media (max-width: 620px) {
+  .gallery-strip .gallery-card {
+    flex-basis: 165px;
+    width: 165px;
+  }
+}
