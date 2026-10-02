@@ -947,12 +947,36 @@ export default function Home() {
   ) {
     const canvas = event.currentTarget;
 
+    // A fresh pointer interaction must never inherit the "dragged" state
+    // from a previous gesture.
+    timelineDidDragRef.current = false;
+
+    /*
+      Desktop mouse fix:
+      When the user clicks a timeline marker, do NOT let the parent SVG
+      capture that mouse pointer. Pointer capture can retarget the rest of
+      the mouse sequence to the SVG and prevent the marker's onClick from
+      firing normally.
+
+      Touch is intentionally NOT blocked here, so mobile can still start a
+      one-finger pan or two-finger pinch even when the finger begins on a
+      marker.
+    */
+    if (event.pointerType === "mouse") {
+      const target = event.target as Element | null;
+      const clickedInteractiveMarker = target?.closest(
+        ".decade-tick, .event-year-marker, .level1-star-marker"
+      );
+
+      if (clickedInteractiveMarker) {
+        return;
+      }
+    }
+
     timelinePointersRef.current.set(event.pointerId, {
       x: event.clientX,
       y: event.clientY,
     });
-
-    timelineDidDragRef.current = false;
 
     try {
       canvas.setPointerCapture(event.pointerId);
