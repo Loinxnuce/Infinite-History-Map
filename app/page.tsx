@@ -172,8 +172,11 @@ export default function Home() {
     ? mobileTimelineViewport.height
     : 200;
   const timelineY = mobileTimelineViewport.active
-    ? Math.min(112, Math.max(96, Math.round(timelineHeight * 0.46)))
+    ? Math.min(112, Math.max(54, Math.round(timelineHeight * 0.5)))
     : 90;
+
+  const compactPhoneTimeline =
+    mobileTimelineViewport.active && timelineHeight < 160;
 
   async function loadNodes() {
     setLoading(true);
@@ -239,7 +242,7 @@ export default function Home() {
       if (!rect.width || !rect.height) return;
 
       const nextWidth = Math.max(320, Math.round(rect.width));
-      const nextHeight = Math.max(190, Math.round(rect.height));
+      const nextHeight = Math.max(100, Math.round(rect.height));
 
       setMobileTimelineViewport((current) => {
         if (
@@ -473,7 +476,7 @@ export default function Home() {
         markers.push({
           event,
           year,
-          y: timelineY - 58,
+          y: compactPhoneTimeline ? 20 : timelineY - 58,
           stackIndex: index,
           stackCount: events.length,
         });
@@ -1609,7 +1612,7 @@ export default function Home() {
                   fill={active ? "#eff6ff" : "#ffffff"}
                   stroke={active ? "#2563eb" : "#e5e7eb"}
                 />
-                <text x={x} y={timelineY + 48} fill="#374151" textAnchor="middle" fontSize={mobileTimelineViewport.active ? "13" : "12"} fontWeight="650">
+                <text x={x} y={timelineY + 48} fill="#374151" textAnchor="middle" fontSize={compactPhoneTimeline ? "10.5" : mobileTimelineViewport.active ? "13" : "12"} fontWeight="650">
                   {formatYear(year)}
                 </text>
               </g>
@@ -1624,20 +1627,24 @@ export default function Home() {
               ? {
                   fill: "#dc2626",
                   textFill: "#dc2626",
-                  radius: mobileTimelineViewport.active ? (count > 1 ? 8 : 7) : (count > 1 ? 7 : 6),
+                  radius: compactPhoneTimeline
+                    ? (count > 1 ? 6.5 : 5.5)
+                    : mobileTimelineViewport.active
+                    ? (count > 1 ? 8 : 7)
+                    : (count > 1 ? 7 : 6),
                   className: "event-year-marker marker-level1",
                 }
               : hasLevel2
               ? {
                   fill: "#fca5a5",
                   textFill: "#ef7777",
-                  radius: mobileTimelineViewport.active ? 5.5 : 4.5,
+                  radius: compactPhoneTimeline ? 4 : mobileTimelineViewport.active ? 5.5 : 4.5,
                   className: "event-year-marker marker-level2",
                 }
               : {
                   fill: "#9ca3af",
                   textFill: "#7b8490",
-                  radius: mobileTimelineViewport.active ? 5.5 : 4.5,
+                  radius: compactPhoneTimeline ? 4 : mobileTimelineViewport.active ? 5.5 : 4.5,
                   className: "event-year-marker marker-level3",
                 };
 
@@ -1662,10 +1669,16 @@ export default function Home() {
                 />
                 <text
                   x={x}
-                  y={timelineY - 20}
+                  y={timelineY - (compactPhoneTimeline ? 13 : 20)}
                   fill={markerStyle.textFill}
                   textAnchor="middle"
-                  fontSize={mobileTimelineViewport.active ? (hasLevel1 ? "13" : "12") : (hasLevel1 ? "11" : "10.5")}
+                  fontSize={
+                    compactPhoneTimeline
+                      ? (hasLevel1 ? "10.5" : "9.5")
+                      : mobileTimelineViewport.active
+                      ? (hasLevel1 ? "13" : "12")
+                      : (hasLevel1 ? "11" : "10.5")
+                  }
                   fontWeight={hasLevel1 ? "800" : "700"}
                 >
                   {formatYear(year)}{count > 1 ? ` · ${count}` : ""}
@@ -1698,8 +1711,8 @@ export default function Home() {
                   points={buildStarPoints(
                     x,
                     marker.y,
-                    mobileTimelineViewport.active ? 19 : 17,
-                    mobileTimelineViewport.active ? 8.7 : 7.8
+                    compactPhoneTimeline ? 13 : mobileTimelineViewport.active ? 19 : 17,
+                    compactPhoneTimeline ? 5.8 : mobileTimelineViewport.active ? 8.7 : 7.8
                   )}
                   fill="#f59e0b"
                   stroke="#ffffff"
