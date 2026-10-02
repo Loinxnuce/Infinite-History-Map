@@ -1139,8 +1139,8 @@ export default function Home() {
     <main className={`history-app${selectedEvent ? " event-open" : selectedDecadeStart !== null ? " decade-open" : ""}`}>
       <header className="app-header">
         <div>
-          <div className="app-title">Infinite History</div>
-          <div className="app-subtitle">Timeline 10 năm · ★ = cấp 1 · màu chấm thể hiện cấp cao nhất trong năm</div>
+          <div className="app-title">Lịch sử Brainstorm</div>
+          <div className="app-subtitle">Một thế hệ ngoành mặt với lịch sử là một thế hệ không có quá khứ - và cũng không có tương lai</div>
         </div>
         <div className="header-status">
           {loading ? "Đang tải dữ liệu..." : `${timelineEvents.length} sự kiện`}
