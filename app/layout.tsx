@@ -1,4 +1,13 @@
 import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Lịch Sử Brainstorm",
+  description: "ghi lại lịch sử",
+  icons: {
+    icon: "/favicon-v2.ico",
+  },
+};
+
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -11,11 +20,6 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
-
-export const metadata: Metadata = {
-  title: "Lịch Sử Brainstorm",
-  description: "ghi lại lịch sử",
-};
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
