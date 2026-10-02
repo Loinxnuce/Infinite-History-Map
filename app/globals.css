@@ -2106,3 +2106,123 @@ button {
     font-size: 11px;
   }
 }
+
+
+/* ===== V2.26 — mobile Add Event form balance ===== */
+
+@media (max-width: 620px) {
+  /*
+    On mobile, the Add Event form must be anchored to the viewport,
+    not to the + Add event button. This prevents the card from extending
+    off the left side of the screen.
+  */
+  .top-actions .add-event-card,
+  .add-event-card {
+    position: fixed;
+    top: 64px;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    z-index: 100;
+    width: auto;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 14px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    border-radius: 12px;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .add-event-title {
+    position: sticky;
+    top: -14px;
+    z-index: 2;
+    margin: -14px -14px 8px;
+    padding: 13px 14px 11px;
+    border-bottom: 1px solid #e5e7eb;
+    background: #ffffff;
+    font-size: 15px;
+  }
+
+  .add-event-card label {
+    margin-top: 9px;
+    margin-bottom: 5px;
+    font-size: 11px;
+  }
+
+  .add-event-card input,
+  .add-event-card select {
+    height: 40px;
+    min-width: 0;
+    font-size: 14px;
+  }
+
+  /* Keep the exact date compact instead of stacking three full-width fields. */
+  .add-event-date-row,
+  .add-event-date-row-three {
+    grid-template-columns: 0.75fr 1fr 1.15fr;
+    gap: 7px;
+  }
+
+  .add-event-date-row > div,
+  .add-event-date-row-three > div {
+    min-width: 0;
+  }
+
+  .add-event-hierarchy-help {
+    margin-top: 7px;
+    font-size: 10px;
+    line-height: 1.4;
+  }
+
+  .content-editor-toolbar {
+    gap: 6px;
+    margin-top: 7px;
+  }
+
+  .content-image-button {
+    min-height: 34px;
+    padding: 0 10px;
+    font-size: 11px;
+  }
+
+  .content-editor-help {
+    max-width: 100%;
+    font-size: 9.5px;
+    line-height: 1.35;
+  }
+
+  .add-event-card .add-event-content-textarea {
+    min-height: 150px;
+    max-height: 38vh;
+    padding: 10px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .add-event-buttons {
+    position: sticky;
+    bottom: -14px;
+    z-index: 2;
+    margin: 14px -14px -14px;
+    padding: 10px 14px 12px;
+    border-top: 1px solid #e5e7eb;
+    background: #ffffff;
+  }
+
+  .add-event-buttons button {
+    min-width: 96px;
+    height: 38px;
+  }
+}
+
+/* Very narrow phones: stack the date fields only when space is truly tight. */
+@media (max-width: 360px) {
+  .add-event-date-row,
+  .add-event-date-row-three {
+    grid-template-columns: 1fr;
+  }
+}
