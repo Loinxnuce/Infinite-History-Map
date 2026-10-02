@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import EventContentEditor from "@/components/EventContentEditor";
 
 type ParentCandidate = {
   id: string;
@@ -272,9 +273,11 @@ export default function AddEventForm() {
           </div>
 
           <label>Nội dung</label>
-          <textarea
+          <EventContentEditor
             value={content}
-            onChange={(event) => setContent(event.target.value)}
+            onChange={setContent}
+            disabled={saving}
+            textareaClassName="add-event-content-textarea"
             placeholder="Viết nội dung về sự kiện ở đây..."
           />
 

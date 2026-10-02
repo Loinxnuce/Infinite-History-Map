@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import AddEventForm from "@/components/AddEventForm";
+import EventContent from "@/components/EventContent";
+import EventContentEditor from "@/components/EventContentEditor";
 import { findEventGallery, type GalleryImage } from "@/lib/findEventGallery";
 
 type HistoryNode = {
@@ -1419,13 +1421,7 @@ export default function Home() {
               </section>
 
               <section className="event-text">
-                {selectedEvent.content?.trim() ? (
-                  selectedEvent.content.split("\n").map((paragraph, index) =>
-                    paragraph.trim() ? <p key={index}>{paragraph}</p> : <div key={index} className="content-space" />
-                  )
-                ) : (
-                  <p className="empty-content">Sự kiện này chưa có nội dung.</p>
-                )}
+                <EventContent content={selectedEvent.content} />
               </section>
 
               <section className="gallery-section">
@@ -1820,7 +1816,13 @@ export default function Home() {
             </div>
 
             <label>Nội dung</label>
-            <textarea value={editContent} onChange={(event) => setEditContent(event.target.value)} />
+            <EventContentEditor
+              value={editContent}
+              onChange={setEditContent}
+              disabled={editSaving}
+              textareaClassName="edit-content-textarea"
+              placeholder="Viết nội dung về sự kiện ở đây..."
+            />
 
             {editError && <div className="edit-error">{editError}</div>}
 

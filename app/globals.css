@@ -1968,3 +1968,141 @@ button {
     top: 27px;
   }
 }
+
+
+/* ===== V2.25 — inline images inside event content ===== */
+
+.event-content-editor {
+  width: 100%;
+}
+
+.content-editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 7px 0 7px;
+}
+
+.content-image-button {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid #b9c7dc;
+  border-radius: 8px;
+  background: #f7faff;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.content-image-button:hover:not(:disabled) {
+  background: #eff6ff;
+}
+
+.content-image-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.content-editor-help {
+  color: #8b95a3;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.content-image-input {
+  display: none;
+}
+
+.content-upload-error {
+  margin-top: 6px;
+  color: #b42318;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.add-event-content-textarea,
+.edit-content-textarea {
+  width: 100%;
+}
+
+/* Keep the existing textarea sizing rules while using the reusable editor. */
+.add-event-card .add-event-content-textarea {
+  min-height: 190px;
+  padding: 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  outline: none;
+  background: #ffffff;
+  color: #111827;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.edit-card .edit-content-textarea {
+  min-height: 260px;
+  padding: 11px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  outline: none;
+  background: #ffffff;
+  color: #111827;
+  resize: vertical;
+  line-height: 1.55;
+}
+
+.add-event-card .add-event-content-textarea:focus,
+.edit-card .edit-content-textarea:focus {
+  border-color: #2563eb;
+}
+
+/* Inline image shown between text paragraphs. */
+.inline-event-image {
+  width: min(900px, 100%);
+  margin: 24px auto;
+}
+
+.inline-event-image img {
+  width: 100%;
+  max-height: 620px;
+  display: block;
+  object-fit: contain;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.inline-event-image figcaption {
+  margin-top: 7px;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+@media (max-width: 620px) {
+  .content-editor-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .content-image-button {
+    min-height: 36px;
+  }
+
+  .inline-event-image {
+    width: 100%;
+    margin: 18px auto;
+  }
+
+  .inline-event-image img {
+    max-height: 420px;
+    border-radius: 8px;
+  }
+
+  .inline-event-image figcaption {
+    padding: 0 4px;
+    font-size: 11px;
+  }
+}
