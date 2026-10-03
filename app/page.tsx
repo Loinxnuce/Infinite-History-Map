@@ -20,6 +20,19 @@ type HistoryNode = {
   parent_id: string | null;
 };
 
+type EventRelation = {
+  id: string;
+  source_id: string;
+  target_id: string;
+  relation_type: string;
+};
+
+function canonicalRelationPair(firstId: string, secondId: string) {
+  return firstId < secondId
+    ? [firstId, secondId] as const
+    : [secondId, firstId] as const;
+}
+
 const MAIN_RANGE_MIN = -10000;
 const MAIN_RANGE_MAX = 2030;
 
@@ -81,8 +94,10 @@ function buildArcPath(x1: number, y1: number, x2: number, y2: number, extraLift:
 
 export default function Home() {
   const [nodes, setNodes] = useState<HistoryNode[]>([]);
+  const [eventRelations, setEventRelations] = useState<EventRelation[]>([]);
   const [loading, setLoading] = useState(true);
   const [databaseError, setDatabaseError] = useState("");
+  const [relationError, setRelationError] = useState("");
 
   const [selectedDecadeStart, setSelectedDecadeStart] = useState<number | null>(null);
   const [selectedYearFocus, setSelectedYearFocus] = useState<number | null>(null);
@@ -124,6 +139,8 @@ export default function Home() {
   const [editContent, setEditContent] = useState("");
   const [editLevel, setEditLevel] = useState(1);
   const [editParentId, setEditParentId] = useState("");
+  const [editRelatedIds, setEditRelatedIds] = useState<string[]>([]);
+  const [editRelationQuery, setEditRelationQuery] = useState("");
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
 
@@ -202,8 +219,25 @@ export default function Home() {
     setLoading(false);
   }
 
+  async function loadEventRelations() {
+    setRelationError("");
+
+    const result = await supabase
+      .from("event_relations")
+      .select("id,source_id,target_id,relation_type")
+      .eq("relation_type", "related");
+
+    if (result.error) {
+      setRelationError(result.error.message);
+      return;
+    }
+
+    setEventRelations(result.data ?? []);
+  }
+
   useEffect(() => {
     loadNodes();
+    loadEventRelations();
   }, []);
 
   useEffect(() => {
@@ -396,6 +430,44 @@ export default function Home() {
     );
   }, [editLevel, timelineEvents, selectedEventId]);
 
+  const editRelationOptions = useMemo(() => {
+    if (editLevel !== 1) return [];
+
+    const query = editRelationQuery.trim().toLowerCase();
+
+    return timelineEvents
+      .filter(
+        (event) =>
+          event.id !== selectedEventId &&
+          eventLevel(event) === 1
+      )
+      .filter((event) =>
+        query ? event.title.toLowerCase().includes(query) : true
+      )
+      .sort((a, b) => {
+        if ((a.year ?? 0) !== (b.year ?? 0)) {
+          return (a.year ?? 0) - (b.year ?? 0);
+        }
+        return a.title.localeCompare(b.title);
+      });
+  }, [editLevel, editRelationQuery, timelineEvents, selectedEventId]);
+
+  function relatedIdsForEvent(eventId: string) {
+    const ids = new Set<string>();
+
+    for (const relation of eventRelations) {
+      if (relation.relation_type !== "related") continue;
+
+      if (relation.source_id === eventId) {
+        ids.add(relation.target_id);
+      } else if (relation.target_id === eventId) {
+        ids.add(relation.source_id);
+      }
+    }
+
+    return Array.from(ids);
+  }
+
   const decadeEvents = useMemo(() => {
     if (selectedDecadeStart === null) return [];
 
@@ -508,6 +580,29 @@ export default function Home() {
 
     return { level1To2 };
   }, [timelineEvents, nodeById]);
+
+  const level1Relations = useMemo(() => {
+    const resolved: {
+      relation: EventRelation;
+      source: HistoryNode;
+      target: HistoryNode;
+    }[] = [];
+
+    for (const relation of eventRelations) {
+      if (relation.relation_type !== "related") continue;
+
+      const source = nodeById.get(relation.source_id);
+      const target = nodeById.get(relation.target_id);
+
+      if (!source || !target) continue;
+      if (source.year === null || target.year === null) continue;
+      if (eventLevel(source) !== 1 || eventLevel(target) !== 1) continue;
+
+      resolved.push({ relation, source, target });
+    }
+
+    return resolved;
+  }, [eventRelations, nodeById]);
 
   const searchResults = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -639,8 +734,90 @@ export default function Home() {
     setEditContent(selectedEvent.content ?? "");
     setEditLevel(eventLevel(selectedEvent));
     setEditParentId(selectedEvent.parent_id ?? "");
+    setEditRelatedIds(
+      eventLevel(selectedEvent) === 1
+        ? relatedIdsForEvent(selectedEvent.id)
+        : []
+    );
+    setEditRelationQuery("");
     setEditError("");
     setEditOpen(true);
+  }
+
+  async function syncLevel1Relations(
+    eventId: string,
+    desiredRelatedIds: string[]
+  ) {
+    const currentRows = eventRelations.filter(
+      (relation) =>
+        relation.relation_type === "related" &&
+        (relation.source_id === eventId || relation.target_id === eventId)
+    );
+
+    const currentRelatedIds = new Set(
+      currentRows.map((relation) =>
+        relation.source_id === eventId
+          ? relation.target_id
+          : relation.source_id
+      )
+    );
+
+    const desiredSet = new Set(
+      desiredRelatedIds.filter((relatedId) => relatedId !== eventId)
+    );
+
+    const additions = Array.from(desiredSet).filter(
+      (relatedId) => !currentRelatedIds.has(relatedId)
+    );
+
+    const removals = currentRows.filter((relation) => {
+      const relatedId =
+        relation.source_id === eventId
+          ? relation.target_id
+          : relation.source_id;
+
+      return !desiredSet.has(relatedId);
+    });
+
+    if (additions.length > 0) {
+      const rows = additions.map((relatedId) => {
+        const [sourceId, targetId] = canonicalRelationPair(
+          eventId,
+          relatedId
+        );
+
+        return {
+          source_id: sourceId,
+          target_id: targetId,
+          relation_type: "related",
+        };
+      });
+
+      const insertResult = await supabase
+        .from("event_relations")
+        .insert(rows);
+
+      if (insertResult.error) {
+        return insertResult.error.message;
+      }
+    }
+
+    if (removals.length > 0) {
+      const deleteResult = await supabase
+        .from("event_relations")
+        .delete()
+        .in(
+          "id",
+          removals.map((relation) => relation.id)
+        );
+
+      if (deleteResult.error) {
+        return deleteResult.error.message;
+      }
+    }
+
+    await loadEventRelations();
+    return "";
   }
 
   async function saveEdit(event: React.FormEvent<HTMLFormElement>) {
@@ -711,16 +888,37 @@ export default function Home() {
       parent_id: parentId,
     };
 
-    const result = await supabase.from("nodes").update(updatedValues).eq("id", selectedEvent.id);
-    setEditSaving(false);
+    const result = await supabase
+      .from("nodes")
+      .update(updatedValues)
+      .eq("id", selectedEvent.id);
 
     if (result.error) {
+      setEditSaving(false);
       setEditError(result.error.message);
       return;
     }
 
+    const relationSaveError = await syncLevel1Relations(
+      selectedEvent.id,
+      editLevel === 1 ? editRelatedIds : []
+    );
+
+    setEditSaving(false);
+
+    if (relationSaveError) {
+      setEditError(
+        `Thông tin sự kiện đã được lưu nhưng liên kết C1 chưa cập nhật được: ${relationSaveError}`
+      );
+      return;
+    }
+
     setNodes((current) =>
-      current.map((node) => (node.id === selectedEvent.id ? { ...node, ...updatedValues } : node))
+      current.map((node) =>
+        node.id === selectedEvent.id
+          ? { ...node, ...updatedValues }
+          : node
+      )
     );
     setSelectedDecadeStart(yearNumber);
     setSelectedYearFocus(yearNumber);
@@ -770,7 +968,16 @@ export default function Home() {
       return;
     }
 
-    setNodes((current) => current.filter((item) => item.id !== selectedEvent.id));
+    setNodes((current) =>
+      current.filter((item) => item.id !== selectedEvent.id)
+    );
+    setEventRelations((current) =>
+      current.filter(
+        (relation) =>
+          relation.source_id !== selectedEvent.id &&
+          relation.target_id !== selectedEvent.id
+      )
+    );
     returnToDecadeList();
   }
 
@@ -1139,8 +1346,8 @@ export default function Home() {
     <main className={`history-app${selectedEvent ? " event-open" : selectedDecadeStart !== null ? " decade-open" : ""}`}>
       <header className="app-header">
         <div>
-          <div className="app-title">LICHSUBrainstorm</div>
-          <div className="app-subtitle">Một thế hệ ngoành mặt với lịch sử là một thế hệ không có quá khứ - và cũng không có tương lai</div>
+          <div className="app-title">Infinite History</div>
+          <div className="app-subtitle">Timeline 10 năm · ★ = cấp 1 · màu chấm thể hiện cấp cao nhất trong năm</div>
         </div>
         <div className="header-status">
           {loading ? "Đang tải dữ liệu..." : `${timelineEvents.length} sự kiện`}
@@ -1282,6 +1489,11 @@ export default function Home() {
 
       <section className="reading-area">
         {databaseError && <div className="database-error">Database error: {databaseError}</div>}
+        {isAdmin && relationError && (
+          <div className="database-error relation-database-error">
+            C1 relation error: {relationError}
+          </div>
+        )}
 
         {selectedEvent ? (
           <article className="event-article">
@@ -1505,8 +1717,8 @@ export default function Home() {
           <div className="empty-reading-state">
             <div className="empty-reading-icon">◌</div>
             <h2>Chào mừng tới dòng chảy lịch sử của tui</h2>
-<h2>Ai đó trên internet này muốn đóng góp thì liên hệ tui cấp account cho tham gia henn =))</h2>
-<p>Tui tạo website này để ghi lại mọi kiến thức về lịch sử, thay cho cái đầu cá vàng không thể nhớ được mọi thứ </p>
+<h2>Ai đó muốn đóng góp thì liên hệ tui cấp account cho tham gia henn =))</h2>
+<p>Tui tạo website này để ghi lại mọi kiến thức về lịch sử mà mình học được, thay cho cái đầu cá vàng không thể nhớ được mọi thứ </p>
           </div>
         )}
       </section>
@@ -1544,6 +1756,47 @@ export default function Home() {
         >
           <rect width={timelineWidth} height={timelineHeight} fill="#ffffff" />
           <line x1="0" y1={timelineY} x2={timelineWidth} y2={timelineY} stroke="#9ca3af" strokeWidth="2" />
+
+          {level1Relations.map(({ relation, source, target }) => {
+            if (source.year === null || target.year === null) return null;
+            if (source.year < minYear || source.year > maxYear) return null;
+            if (target.year < minYear || target.year > maxYear) return null;
+
+            const sourceMarker = level1MarkerById.get(source.id);
+            const targetMarker = level1MarkerById.get(target.id);
+
+            const sourceOffset = sourceMarker
+              ? (sourceMarker.stackIndex - (sourceMarker.stackCount - 1) / 2) * 38
+              : 0;
+            const targetOffset = targetMarker
+              ? (targetMarker.stackIndex - (targetMarker.stackCount - 1) / 2) * 38
+              : 0;
+
+            const x1 = yearToX(source.year) + sourceOffset;
+            const x2 = yearToX(target.year) + targetOffset;
+            const y1 = sourceMarker?.y ?? (compactPhoneTimeline ? 20 : timelineY - 58);
+            const y2 = targetMarker?.y ?? (compactPhoneTimeline ? 20 : timelineY - 58);
+            const span = Math.abs(x2 - x1);
+            const midX = (x1 + x2) / 2;
+            const controlY = Math.min(
+              timelineY - 7,
+              Math.max(y1, y2) + 16 + Math.min(28, span * 0.035)
+            );
+            const path =
+              span < 1
+                ? `M ${x1} ${y1} Q ${x1 + 16} ${controlY} ${x2} ${y2}`
+                : `M ${x1} ${y1} Q ${midX} ${controlY} ${x2} ${y2}`;
+
+            return (
+              <path
+                key={`c1-relation-${relation.id}`}
+                d={path}
+                className="timeline-relation-level1"
+                fill="none"
+                strokeLinecap="round"
+              />
+            );
+          })}
 
           {hierarchyLinks.level1To2.map(({ parent, child }) => {
             if (parent.year === null || child.year === null) return null;
@@ -1788,6 +2041,10 @@ export default function Home() {
                     const nextLevel = Number(event.target.value);
                     setEditLevel(nextLevel);
                     setEditParentId("");
+                    if (nextLevel !== 1) {
+                      setEditRelatedIds([]);
+                      setEditRelationQuery("");
+                    }
                   }}
                 >
                   <option value={1}>Cấp 1 · Sự kiện gốc</option>
@@ -1814,6 +2071,63 @@ export default function Home() {
                 </div>
               )}
             </div>
+
+            {editLevel === 1 && (
+              <div className="c1-relation-editor">
+                <div className="c1-relation-heading">
+                  <label>Liên kết C1 ↔ C1</label>
+                  <span>{editRelatedIds.length} liên kết</span>
+                </div>
+
+                <div className="c1-relation-help">
+                  Đây chỉ là quan hệ liên quan giữa hai sự kiện cấp 1, không thay đổi cấu trúc cha–con C1 → C2 → C3.
+                </div>
+
+                <input
+                  className="c1-relation-search"
+                  value={editRelationQuery}
+                  onChange={(event) =>
+                    setEditRelationQuery(event.target.value)
+                  }
+                  placeholder="Tìm sự kiện cấp 1..."
+                />
+
+                <div className="c1-relation-list">
+                  {editRelationOptions.length === 0 ? (
+                    <div className="c1-relation-empty">
+                      Không có sự kiện cấp 1 phù hợp.
+                    </div>
+                  ) : (
+                    editRelationOptions.map((candidate) => {
+                      const checked = editRelatedIds.includes(candidate.id);
+
+                      return (
+                        <label
+                          className={`c1-relation-option${checked ? " selected" : ""}`}
+                          key={candidate.id}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => {
+                              setEditRelatedIds((current) =>
+                                checked
+                                  ? current.filter((id) => id !== candidate.id)
+                                  : [...current, candidate.id]
+                              );
+                            }}
+                          />
+                          <span className="c1-relation-option-title">
+                            {candidate.title}
+                          </span>
+                          <small>{formatYear(candidate.year)}</small>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
 
             <label>Nội dung</label>
             <EventContentEditor

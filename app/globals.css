@@ -2513,3 +2513,157 @@ button {
     font-size: 11px;
   }
 }
+
+
+/* ===== V2.28 — C1 ↔ C1 related-event connections ===== */
+
+/* Separate visual language from the existing golden C1 → C2 hierarchy arc. */
+.timeline-relation-level1 {
+  stroke: #64748b;
+  stroke-width: 1.35;
+  opacity: 0.58;
+  pointer-events: none;
+}
+
+/* Relation picker used in both Add Event and Edit Event. */
+.c1-relation-editor {
+  margin-top: 12px;
+  padding: 11px;
+  border: 1px solid #dbe2ea;
+  border-radius: 9px;
+  background: #fbfcfe;
+}
+
+.c1-relation-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.c1-relation-heading label {
+  margin: 0;
+  color: #374151;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.c1-relation-heading span {
+  color: #8b95a3;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.c1-relation-help {
+  margin-top: 4px;
+  color: #8b95a3;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.add-event-card .c1-relation-search,
+.edit-card .c1-relation-search {
+  width: 100%;
+  height: 36px;
+  margin-top: 8px;
+  padding: 0 9px;
+  border: 1px solid #d1d5db;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 12px;
+}
+
+.c1-relation-list {
+  max-height: 150px;
+  margin-top: 7px;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 7px;
+  background: #ffffff;
+}
+
+.c1-relation-option {
+  display: grid !important;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  margin: 0 !important;
+  padding: 7px 8px;
+  border-bottom: 1px solid #f0f2f5;
+  color: #374151;
+  cursor: pointer;
+}
+
+.c1-relation-option:last-child {
+  border-bottom: 0;
+}
+
+.c1-relation-option:hover,
+.c1-relation-option.selected {
+  background: #f8fafc;
+}
+
+.add-event-card .c1-relation-option input[type="checkbox"],
+.edit-card .c1-relation-option input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  margin: 0;
+  padding: 0;
+  accent-color: #64748b;
+}
+
+.c1-relation-option-title {
+  min-width: 0;
+  overflow: hidden;
+  color: #1f2937;
+  font-size: 11px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.c1-relation-option small {
+  color: #8b95a3;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.c1-relation-empty {
+  padding: 12px 9px;
+  color: #8b95a3;
+  font-size: 10px;
+  text-align: center;
+}
+
+.relation-database-error {
+  top: 56px;
+}
+
+@media (max-width: 620px) {
+  .c1-relation-editor {
+    margin-top: 10px;
+    padding: 9px;
+  }
+
+  .c1-relation-help {
+    font-size: 9.5px;
+  }
+
+  .add-event-card .c1-relation-search,
+  .edit-card .c1-relation-search {
+    height: 34px;
+    font-size: 12px;
+  }
+
+  .c1-relation-list {
+    max-height: 118px;
+  }
+
+  .c1-relation-option {
+    min-height: 36px;
+    padding: 6px 7px;
+  }
+}

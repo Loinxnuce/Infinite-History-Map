@@ -20,6 +20,12 @@ function eventLevel(event: ParentCandidate) {
   return event.importance_level ?? 1;
 }
 
+function canonicalRelationPair(firstId: string, secondId: string) {
+  return firstId < secondId
+    ? [firstId, secondId] as const
+    : [secondId, firstId] as const;
+}
+
 function formatYear(year: number | null) {
   if (year === null) return "Không rõ năm";
   return year < 0 ? `${Math.abs(year)} TCN` : String(year);
@@ -46,6 +52,8 @@ export default function AddEventForm() {
   const [content, setContent] = useState("");
   const [importanceLevel, setImportanceLevel] = useState(1);
   const [parentId, setParentId] = useState("");
+  const [relatedLevel1Ids, setRelatedLevel1Ids] = useState<string[]>([]);
+  const [relationQuery, setRelationQuery] = useState("");
   const [parentCandidates, setParentCandidates] = useState<ParentCandidate[]>([]);
   const [parentLoading, setParentLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -89,6 +97,18 @@ export default function AddEventForm() {
       (event) => eventLevel(event) === importanceLevel - 1
     );
   }, [importanceLevel, parentCandidates]);
+
+  const relationCandidates = useMemo(() => {
+    if (importanceLevel !== 1) return [];
+
+    const query = relationQuery.trim().toLowerCase();
+
+    return parentCandidates
+      .filter((event) => eventLevel(event) === 1)
+      .filter((event) =>
+        query ? event.title.toLowerCase().includes(query) : true
+      );
+  }, [importanceLevel, relationQuery, parentCandidates]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -143,24 +163,75 @@ export default function AddEventForm() {
 
     setSaving(true);
 
-    const result = await supabase.from("nodes").insert({
-      type: "event",
-      title: title.trim(),
-      day,
-      month,
-      year: yearNumber,
-      content: content.trim() || null,
-      category: null,
-      importance_level: importanceLevel,
-      parent_id: finalParentId,
-    });
+    const result = await supabase
+      .from("nodes")
+      .insert({
+        type: "event",
+        title: title.trim(),
+        day,
+        month,
+        year: yearNumber,
+        content: content.trim() || null,
+        category: null,
+        importance_level: importanceLevel,
+        parent_id: finalParentId,
+      })
+      .select("id")
+      .single();
 
-    setSaving(false);
-
-    if (result.error) {
-      setErrorMessage(result.error.message);
+    if (result.error || !result.data?.id) {
+      setSaving(false);
+      setErrorMessage(
+        result.error?.message ?? "Không lấy được ID của sự kiện mới."
+      );
       return;
     }
+
+    if (importanceLevel === 1 && relatedLevel1Ids.length > 0) {
+      const validRelatedIds = relatedLevel1Ids.filter((relatedId) =>
+        parentCandidates.some(
+          (candidate) =>
+            candidate.id === relatedId &&
+            eventLevel(candidate) === 1
+        )
+      );
+
+      const relationRows = validRelatedIds.map((relatedId) => {
+        const [sourceId, targetId] = canonicalRelationPair(
+          result.data.id,
+          relatedId
+        );
+
+        return {
+          source_id: sourceId,
+          target_id: targetId,
+          relation_type: "related",
+        };
+      });
+
+      if (relationRows.length > 0) {
+        const relationResult = await supabase
+          .from("event_relations")
+          .insert(relationRows);
+
+        if (relationResult.error) {
+          // Roll back the new node so the user does not end up with
+          // a half-created event whose selected relations were lost.
+          await supabase
+            .from("nodes")
+            .delete()
+            .eq("id", result.data.id);
+
+          setSaving(false);
+          setErrorMessage(
+            `Không thể tạo liên kết C1: ${relationResult.error.message}`
+          );
+          return;
+        }
+      }
+    }
+
+    setSaving(false);
 
     setTitle("");
     setDay(1);
@@ -169,6 +240,8 @@ export default function AddEventForm() {
     setContent("");
     setImportanceLevel(1);
     setParentId("");
+    setRelatedLevel1Ids([]);
+    setRelationQuery("");
     setOpen(false);
 
     window.location.reload();
@@ -236,8 +309,14 @@ export default function AddEventForm() {
               <select
                 value={importanceLevel}
                 onChange={(event) => {
-                  setImportanceLevel(Number(event.target.value));
+                  const nextLevel = Number(event.target.value);
+                  setImportanceLevel(nextLevel);
                   setParentId("");
+
+                  if (nextLevel !== 1) {
+                    setRelatedLevel1Ids([]);
+                    setRelationQuery("");
+                  }
                 }}
               >
                 <option value={1}>Cấp 1 · Sự kiện gốc</option>
@@ -271,6 +350,64 @@ export default function AddEventForm() {
           <div className="add-event-hierarchy-help">
             Cấp 1 là sự kiện gốc. Cấp 2 bắt buộc thuộc một sự kiện cấp 1; cấp 3 bắt buộc thuộc một sự kiện cấp 2.
           </div>
+
+          {importanceLevel === 1 && (
+            <div className="c1-relation-editor">
+              <div className="c1-relation-heading">
+                <label>Liên kết C1 ↔ C1</label>
+                <span>{relatedLevel1Ids.length} liên kết</span>
+              </div>
+
+              <div className="c1-relation-help">
+                Tùy chọn. Chọn các sự kiện cấp 1 có liên quan; đây không phải quan hệ cha–con.
+              </div>
+
+              <input
+                className="c1-relation-search"
+                value={relationQuery}
+                onChange={(event) => setRelationQuery(event.target.value)}
+                placeholder="Tìm sự kiện cấp 1..."
+                disabled={parentLoading}
+              />
+
+              <div className="c1-relation-list">
+                {relationCandidates.length === 0 ? (
+                  <div className="c1-relation-empty">
+                    {parentLoading
+                      ? "Đang tải..."
+                      : "Chưa có sự kiện cấp 1 phù hợp."}
+                  </div>
+                ) : (
+                  relationCandidates.map((candidate) => {
+                    const checked = relatedLevel1Ids.includes(candidate.id);
+
+                    return (
+                      <label
+                        className={`c1-relation-option${checked ? " selected" : ""}`}
+                        key={candidate.id}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => {
+                            setRelatedLevel1Ids((current) =>
+                              checked
+                                ? current.filter((id) => id !== candidate.id)
+                                : [...current, candidate.id]
+                            );
+                          }}
+                        />
+                        <span className="c1-relation-option-title">
+                          {candidate.title}
+                        </span>
+                        <small>{formatYear(candidate.year)}</small>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
 
           <label>Nội dung</label>
           <EventContentEditor
