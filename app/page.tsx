@@ -1346,7 +1346,7 @@ export default function Home() {
     <main className={`history-app${selectedEvent ? " event-open" : selectedDecadeStart !== null ? " decade-open" : ""}`}>
       <header className="app-header">
         <div>
-          <div className="app-title">Infinite History</div>
+          <div className="app-title">LICHSUBrainstorm</div>
           <div className="app-subtitle">Timeline 10 năm · ★ = cấp 1 · màu chấm thể hiện cấp cao nhất trong năm</div>
         </div>
         <div className="header-status">
@@ -1716,9 +1716,8 @@ export default function Home() {
         ) : (
           <div className="empty-reading-state">
             <div className="empty-reading-icon">◌</div>
-            <h2>Chào mừng tới dòng chảy lịch sử của tui</h2>
-<h2>Ai đó muốn đóng góp thì liên hệ tui cấp account cho tham gia henn =))</h2>
-<p>Tui tạo website này để ghi lại mọi kiến thức về lịch sử mà mình học được, thay cho cái đầu cá vàng không thể nhớ được mọi thứ </p>
+            <h2>“Một thế hệ ngoảnh mặt lại với lịch sử là một thế hệ không có quá khứ - và cũng không có tương lai”</h2>
+            <p><strong>Robert A. Heinlein</strong></p>
           </div>
         )}
       </section>
